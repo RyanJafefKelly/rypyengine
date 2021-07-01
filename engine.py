@@ -1,18 +1,20 @@
 import numpy as np
-
+from collections import namedtuple
+from itertools import count
+import re
 
 # TODO: smarter number values
-piece = { 'P': 100, 'N': 300, 'B': 300, 'R': 500, 'Q': 900, 'K': 60000 }
+piece = {'P': 100, 'N': 300, 'B': 300, 'R': 500, 'Q': 900, 'K': 60000}
 #TODO: piece-square table from sunfish... add opening + end game
 pst = {
-    'P': [  0,   0,   0,   0,   0,   0,   0,   0,
-            78,  83,  86,  73, 102,  82,  85,  90,
-             7,  29,  21,  44,  40,  31,  44,   7,
-           -17,  16,  -2,  15,  14,   0,  15, -13,
-           -26,   3,  10,   9,   6,   1,   0, -23,
-           -22,   9,   5, -11, -10,  -2,   3, -19,
-           -31,   8,  -7, -37, -36, -14,   3, -31,
-             0,   0,   0,   0,   0,   0,   0,   0],
+    'P': [0,   0,   0,   0,   0,   0,   0,   0,
+          78,  83,  86,  73, 102,  82,  85,  90,
+          7,  29,  21,  44,  40,  31,  44,   7,
+          -17,  16,  -2,  15,  14,   0,  15, -13,
+          -26,   3,  10,   9,   6,   1,   0, -23,
+          -22,   9,   5, -11, -10,  -2,   3, -19,
+          -31,   8,  -7, -37, -36, -14,   3, -31,
+          0,   0,   0,   0,   0,   0,   0,   0],
     'N': [ -66, -53, -75, -75, -10, -55, -58, -70,
             -3,  -6, 100, -36,   4,  62,  -4, -14,
             10,  67,   1,  74,  73,  27,  62,  -2,
@@ -72,8 +74,7 @@ for k, table in pst.items():
         # print('test', test)
 
 ## GLOBAL CONSTANTS
-
-A8, H8, A1, H8 = 21, 28, 91, 98  # white at "bottom"
+A8, H8, A1, H1 = 21, 28, 91, 98  # white at "bottom"
 # lowercase - black, UPPER - white, letters - explanatory, \n - empty
 init_board = ['FF'] * 20 + ['FF'] + ['r', 'n', 'b', 'q', 'k', 'b', 'n', 'r'] + \
              ['FF'] + ['FF'] + 8*['p'] + ['FF']  + \
@@ -83,6 +84,17 @@ init_board = ['FF'] * 20 + ['FF'] + ['r', 'n', 'b', 'q', 'k', 'b', 'n', 'r'] + \
              20*['FF']
 
 # Lists of possible moves for each      piece type.
+up, down, left, right = -10, 10, -1, 1 # numbers referring to change idx
+directions = {
+    'P': (up, up+up, up+left, up+right),
+    'R': (up, down, left, right),
+    'N': (up+up+left, up+up+right, right+right+up, right+right+down,
+          down+down+right, down+down+left, left+left+down, left+left+up),
+    'B': (up+left, up+right, down+left, down+right),
+    'K': (up+left, up, up+right, left, right, down+left, down, down+right),
+    'Q': (up+left, up, up+right, left, right, down+left, down, down+right),
+    'FF': ()
+}
 
 # TODO: curr copied sunfish
 # Mate value must be greater than 8*queen + 2*(rook+knight+bishop)
@@ -93,17 +105,117 @@ init_board = ['FF'] * 20 + ['FF'] + ['r', 'n', 'b', 'q', 'k', 'b', 'n', 'r'] + \
 MATE_LOWER = piece['K'] - 10*piece['Q']
 MATE_UPPER = piece['K'] + 10*piece['Q']
 
+# TODO: Include below constants?
 # Table size
+# TABLE_SIZE = 1e7
 # Constants tuning search
+# QS_LIMIT = 219
+# EVAL_ROUGHNESS = 13
+# DRAW_TEST = True
 
 # Chess Logic
 # class Position
-class Position:
-    pass
+class Position(namedtuple('Position',
+'board score castling opp_castling en_passant')):
+    """[summary]
+
+    Args:
+        board ([type]): [description]
+        score ([type]): [description]
+        castling ([type]): [description]
+        opp_castling ([type]): [description]
+        en_passant ([type]): [description]
+        king_passant ([type]): [description]
+    """
+
+    def generate_moves(self):
+        moves = []
+        for i, p in enumerate(self.board):
+            if not p.isupper():
+                continue
+            if p is 'FF':
+                continue
+            for d in directions[p]:
+                for j in count(i+d, d):
+                    q = self.board[j]
+                    # Stay inside the board, and off friendly pieces
+                    if q.isupper() or q == 'FF':
+                        break
+                    # Pawn move, double move and capture
+                    if p == 'P' and d in (up, up+up) and q != 'o':
+                        break
+                    if p == 'P' and d == up+up and (i < A1 + up or self.board[i+up] != 'o'):
+                        break
+                    if p == 'P' and d in (up+left, up+right) and q == 'o':
+                        break
+                    moves.append((i, j))
+                    # Stop at pieces move w/o/ sliding and captures
+                    if p in 'PNK' or q.islower():
+                        break
+                    # Castling
+
+        return moves
+                    
+    def rotate(self):
+        pass
+
+    def null_move(self):
+        pass
+
+    def move(self, move):
+        x, y = move
+        p, q = self.board[x], self.board[y]
+        print('x', x, 'y', y)
+        print('p', p, 'q', q)
+        
+        def put(board, x, p):
+            return board[:x] + [p] + board[x+1:]  # insert
+        
+        board = self.board
+        # TODO?   Copy variables and reset ep and kp
+        castling, opp_castling, en_passant = self.castling, self.opp_castling, 0
+        score = self.score + self.value(move)
+
+        # Actual move logic
+        board = put(board, y, board[x])
+        board = put(board, x, 'o')
+
+        # Castling rights, we move the rook or capture the opponent's
+        if x == A1:
+            castling = (False, opp_castling[1])
+        if x == H1:
+            castling = (opp_castling[0], False)
+        if y == A8:
+            opp_castling = (castling[0], False)
+        if y == H8:
+            opp_castling = (False, castling[1])
+        # TODO: Castling logic
+        if p == 'K':
+            opp_castling = (False, False)
+        # TODO: Pawn Promotion
+        return Position(board, score, castling, opp_castling, en_passant)
+
+    def value(self, move):
+        return 0
+
+
 # Search logic
 # class Searcher
 class Searcher:
-    pass
+    def __init__(self):
+        pass
+
+    def bound(self, pos, gamma, depth, root=True):
+        pass
+
+        def moves():
+            pass
+
+    def search(self, pos, history=()):
+        pass
+
+
+
 # User interface
 
 def print_board(board):
@@ -138,16 +250,54 @@ def print_board(board):
     }
     for ii, row in enumerate(list(chunks(reduced_board, 10))):
         # incredible unicode includes chess pieces
-        print(ii, end='  ')
+        print(8-ii, end='  ')
         for el in row:  # double for loop but really doesn't matter for this...
             print(chess_symbol_dict[el], sep=' ', end='')
         print('')
     print('   a b c d e f g h')
     return
 
+
+def parse_to_index(c):
+    file, rank = ord(c[0]) - ord('a'), int(c[1]) - 1
+    idx = A1 + file - 10 * rank
+    return idx
+
 def main():
 
-    print_board(init_board)
+    # print_board(init_board)
+    moves = [Position(board=init_board, score=0, castling=[True, True],
+    opp_castling=[True, True], en_passant=0)]
+    searcher = Searcher()
+    while True:
+        print_board(moves[-1].board)
+        if moves[-1].score <= -MATE_LOWER:
+            print("You lose!")
+
+            break
+
+        # query until enter a pseudo-legal move
+        move_list = moves[-1].generate_moves()
+        move = None
+        while move not in move_list:
+            match = re.match('([a-h][1-8])'*2, input('Your move: '))
+            if match:
+                move = parse_to_index(match.group(1)), parse_to_index(match.group(2))
+                if move not in move_list:
+                    print("Not a valid move")
+            else:
+                print("Please enter a move like c2c3")
+
+        moves.append(moves[-1].move(move))
+        print_board(moves[-1].board)
+
+        # after move rotate board and print to see effect of move
+
+        # Search for a move
+
+        # rotate back to display
+
+        break
     pass
 
 if __name__ == '__main__':
