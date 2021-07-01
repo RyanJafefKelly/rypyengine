@@ -75,11 +75,14 @@ for k, table in pst.items():
 
 A8, H8, A1, H8 = 21, 28, 91, 98  # white at "bottom"
 # lowercase - black, UPPER - white, letters - explanatory, \n - empty
-init_board = ['\n'] * 20 + ['r', 'n', 'b', 'q', 'k', 'b', 'n', 'r'] + ['p'] * 8 \
-             + ['\n'] * 40 + ['P'] * 8 + ['R', 'N', 'B', 'Q', 'K', 'B', 'N', 'R'] \
-             + ['\n'] * 20
-print('init_board', init_board)
-# Lists of possible moves for each piece type.
+init_board = ['FF'] * 20 + ['FF'] + ['r', 'n', 'b', 'q', 'k', 'b', 'n', 'r'] + \
+             ['FF'] + ['FF'] + 8*['p'] + ['FF']  + \
+             4*(['FF'] + 8*['o'] + ['FF']) + \
+             ['FF'] + 8*['P'] + ['FF'] + \
+             ['FF'] + ['R', 'N', 'B', 'Q', 'K', 'B', 'N', 'R'] + ['FF'] + \
+             20*['FF']
+
+# Lists of possible moves for each      piece type.
 
 # TODO: curr copied sunfish
 # Mate value must be greater than 8*queen + 2*(rook+knight+bishop)
@@ -94,11 +97,59 @@ MATE_UPPER = piece['K'] + 10*piece['Q']
 # Constants tuning search
 
 # Chess Logic
-
 # class Position
-
+class Position:
+    pass
 # Search logic
-
 # class Searcher
+class Searcher:
+    pass
+# User interface
 
-# User interface        
+def print_board(board):
+    print('board', board)
+    # board is 120 char
+    def chunks(lst, n):
+        """stackoverflow...split list evenly sized chunks
+
+        Args:
+            lst ([type]): [description]
+            n ([type]): [description]
+        """
+        for i in range(0, len(lst), n):
+            yield lst[i:i+n]
+
+    reduced_board = board[20:100] # remove first and last 2  sentinel rows 
+    chess_symbol_dict = {
+        'FF': '', # sentinel val
+        'R': '♜ ',
+        'N': '♞ ',
+        'B': '♝ ',
+        'Q': '♛ ',
+        'K': '♚ ',
+        'P': '♟︎ ',
+        'r': '♖ ',
+        'n': '♘ ',
+        'b': '♗ ',
+        'q': '♕ ',
+        'k': '♔ ',
+        'p': '♙ ',
+        'o': '. ' # blank on board
+    }
+    for ii, row in enumerate(list(chunks(reduced_board, 10))):
+        # incredible unicode includes chess pieces
+        print(ii, end='  ')
+        for el in row:  # double for loop but really doesn't matter for this...
+            print(chess_symbol_dict[el], sep=' ', end='')
+        print('')
+    print('   a b c d e f g h')
+    return
+
+def main():
+
+    print_board(init_board)
+    pass
+
+if __name__ == '__main__':
+    main()
+
